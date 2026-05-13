@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2c1a0c"/>
+      <stop offset="100%" stop-color="#4a2e18"/>
+    </linearGradient>
+    <!-- Book spine gradients — vertical, top lighter than bottom -->
+    <linearGradient id="s1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#56391f"/>
+      <stop offset="100%" stop-color="#3a2410"/>
+    </linearGradient>
+    <linearGradient id="s2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8c5a32"/>
+      <stop offset="100%" stop-color="#673f1e"/>
+    </linearGradient>
+    <linearGradient id="s3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#b07840"/>
+      <stop offset="100%" stop-color="#895a26"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background — iOS-style squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Rim highlight -->
+  <rect width="512" height="512" rx="112" fill="none" stroke="#c8a97a" stroke-width="1.5" opacity="0.14"/>
+
+  <!--
+    Three books, bottom-aligned at y=406.
+    Heights: left 240, middle 296 (tallest), right 212.
+    Widths:  left 72,  middle 92,            right 70.
+    Gaps: 12px each side.
+    Total group width: 72 + 12 + 92 + 12 + 70 = 258
+    Left edge: (512 - 258) / 2 = 127
+  -->
+
+  <!-- ── Left book (dark chocolate) ── -->
+  <rect x="127" y="166" width="72" height="240" rx="4" fill="url(#s1)"/>
+  <!-- Page-top edge -->
+  <rect x="129" y="162" width="68" height="7" rx="2" fill="#eddfc8" opacity="0.7"/>
+  <!-- Inset border -->
+  <rect x="135" y="175" width="56" height="224" rx="2" fill="none" stroke="#c8a070" stroke-width="0.8" opacity="0.22"/>
+  <!-- Left-spine highlight -->
+  <rect x="127" y="166" width="4" height="240" rx="1" fill="#fff" opacity="0.07"/>
+  <!-- Spine decoration lines (title suggestion) -->
+  <rect x="139" y="206" width="44" height="3" rx="1.5" fill="#c8a070" opacity="0.3"/>
+  <rect x="139" y="216" width="30" height="3" rx="1.5" fill="#c8a070" opacity="0.2"/>
+  <rect x="139" y="336" width="40" height="3" rx="1.5" fill="#c8a070" opacity="0.22"/>
+
+  <!-- ── Middle book (warm brown, tallest) ── -->
+  <rect x="211" y="110" width="92" height="296" rx="4" fill="url(#s2)"/>
+  <!-- Page-top edge -->
+  <rect x="213" y="106" width="88" height="7" rx="2" fill="#eddfc8" opacity="0.7"/>
+  <!-- Inset border -->
+  <rect x="219" y="119" width="76" height="279" rx="2" fill="none" stroke="#c8a070" stroke-width="0.8" opacity="0.22"/>
+  <!-- Left-spine highlight -->
+  <rect x="211" y="110" width="5" height="296" rx="1" fill="#fff" opacity="0.07"/>
+  <!-- Spine decoration lines -->
+  <rect x="224" y="158" width="58" height="3.5" rx="1.5" fill="#c8a070" opacity="0.32"/>
+  <rect x="224" y="169" width="42" height="3.5" rx="1.5" fill="#c8a070" opacity="0.22"/>
+  <rect x="224" y="338" width="52" height="3.5" rx="1.5" fill="#c8a070" opacity="0.25"/>
+  <rect x="224" y="350" width="36" height="3.5" rx="1.5" fill="#c8a070" opacity="0.16"/>
+
+  <!-- Bookmark ribbon — signature detail -->
+  <path d="M245 106 L245 56 L275 56 L275 106 L260 94 Z" fill="#c8a97a"/>
+  <!-- Inner crease line on bookmark -->
+  <line x1="260" y1="56" x2="260" y2="96" stroke="#fff" stroke-width="1.2" opacity="0.22"/>
+  <!-- Highlight on bookmark left edge -->
+  <line x1="246" y1="58" x2="246" y2="104" stroke="#fff" stroke-width="1" opacity="0.18"/>
+
+  <!-- ── Right book (amber) ── -->
+  <rect x="315" y="194" width="70" height="212" rx="4" fill="url(#s3)"/>
+  <!-- Page-top edge -->
+  <rect x="317" y="190" width="66" height="7" rx="2" fill="#eddfc8" opacity="0.7"/>
+  <!-- Inset border -->
+  <rect x="323" y="202" width="54" height="196" rx="2" fill="none" stroke="#c8a070" stroke-width="0.8" opacity="0.22"/>
+  <!-- Left-spine highlight -->
+  <rect x="315" y="194" width="4" height="212" rx="1" fill="#fff" opacity="0.07"/>
+  <!-- Spine decoration lines -->
+  <rect x="327" y="226" width="42" height="3" rx="1.5" fill="#c8a070" opacity="0.28"/>
+  <rect x="327" y="236" width="28" height="3" rx="1.5" fill="#c8a070" opacity="0.2"/>
+  <rect x="327" y="330" width="38" height="3" rx="1.5" fill="#c8a070" opacity="0.22"/>
+
+  <!-- Ground shadow under books -->
+  <ellipse cx="256" cy="410" rx="118" ry="7" fill="#000" opacity="0.22"/>
+</svg>

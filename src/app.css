@@ -1,0 +1,76 @@
+:root {
+	--cream-lightest: #fdfaf4;
+	--cream-light: #f5eed8;
+	--cream: #ede3c8;
+	--cream-dark: #dfd1b0;
+	--brown-pale: #c8a97a;
+	--brown-light: #a07850;
+	--brown: #7a5230;
+	--brown-mid: #5c3a1e;
+	--brown-dark: #3d2210;
+	--brown-ink: #2a1a0a;
+	--text: #2a1a0a;
+	--text-muted: #7a6248;
+	--text-faint: #a89070;
+	--border: #d4c4a0;
+	--border-light: #e8dcbf;
+	--shadow: rgba(42, 26, 10, 0.12);
+	--shadow-deep: rgba(42, 26, 10, 0.25);
+	--reading-accent: #c4783a;
+	--read-accent: #5a7a3a;
+	--planned-accent: #7a6248;
+
+	--radius-sm: 4px;
+	--radius: 8px;
+	--radius-lg: 14px;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	font-size: 16px;
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--cream-light);
+	color: var(--text);
+	font-family:
+		'Georgia',
+		'Times New Roman',
+		serif;
+	line-height: 1.6;
+	min-height: 100dvh;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+button {
+	font-family: inherit;
+	cursor: pointer;
+}
+
+input,
+textarea {
+	font-family: inherit;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
