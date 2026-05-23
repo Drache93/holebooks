@@ -39,6 +39,7 @@
     let pendingRating = $state(untrack(() => data.book.rating ?? 0));
     let noteSaved = $state(false);
     let progressSaved = $state(false);
+    let ratingSaved = $state(false);
     let submitting = $state(false);
     let editOpen = $state(false);
     let editTitle = $state(untrack(() => data.book.title));
@@ -87,6 +88,24 @@
                 await update({ reset: false });
                 onSuccess?.();
             };
+    }
+
+    async function saveRating(stars: number) {
+        pendingRating = stars;
+        const fd = new FormData();
+        fd.set("rating", String(stars));
+        try {
+            const res = await fetch("?/setRating", { method: "POST", body: fd });
+            if (res.ok) {
+                await invalidateAll();
+                ratingSaved = true;
+                setTimeout(() => (ratingSaved = false), 2000);
+            } else {
+                showError("Failed to save rating");
+            }
+        } catch {
+            showError("Network error");
+        }
     }
 
     // Quick-add pages — auto-submits directly via fetch
@@ -334,32 +353,22 @@
             {#if book.status === "read"}
                 <div class="card anim">
                     <p class="card-label">Your rating</p>
-                    <form
-                        method="POST"
-                        action="?/setRating"
-                        use:enhance={mkEnhance()}
-                    >
-                        <div class="stars-row">
-                            {#each [1, 2, 3, 4, 5] as s}
-                                <button
-                                    type="button"
-                                    class="star"
-                                    class:on={s <=
-                                        (hoverRating || pendingRating)}
-                                    onmouseenter={() => (hoverRating = s)}
-                                    onmouseleave={() => (hoverRating = 0)}
-                                    onclick={() => (pendingRating = s)}
-                                    aria-label="{s} star">★</button
-                                >
-                            {/each}
-                        </div>
-                        <input
-                            type="hidden"
-                            name="rating"
-                            value={pendingRating}
-                        />
-                        <button class="btn-primary btn-sm">Save rating</button>
-                    </form>
+                    <div class="stars-row">
+                        {#each [1, 2, 3, 4, 5] as s}
+                            <button
+                                type="button"
+                                class="star"
+                                class:on={s <= (hoverRating || pendingRating)}
+                                onmouseenter={() => (hoverRating = s)}
+                                onmouseleave={() => (hoverRating = 0)}
+                                onclick={() => saveRating(s)}
+                                aria-label="{s} star">★</button
+                            >
+                        {/each}
+                        {#if ratingSaved}
+                            <span class="rating-saved">Saved ✓</span>
+                        {/if}
+                    </div>
                 </div>
             {/if}
 
@@ -369,6 +378,7 @@
                 <form
                     method="POST"
                     action="?/saveNotes"
+                    enctype="multipart/form-data"
                     use:enhance={mkEnhance(() => {
                         noteSaved = true;
                         setTimeout(() => (noteSaved = false), 2000);
@@ -421,6 +431,7 @@
                     <form
                         method="POST"
                         action="?/editDetails"
+                        enctype="multipart/form-data"
                         style="margin-top:16px"
                         use:enhance={mkEnhance(() => {
                             editOpen = false;
@@ -516,7 +527,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 12px var(--page-pad);
+        padding: max(12px, env(safe-area-inset-top)) var(--page-pad) 12px;
         background: var(--surface);
         border-bottom: 1px solid var(--border);
         position: sticky;
@@ -897,6 +908,14 @@
     }
     .star:active {
         transform: scale(1.2);
+    }
+
+    .rating-saved {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--green);
+        align-self: center;
+        margin-left: 4px;
     }
 
     /* ── Date toggle ── */

@@ -13,8 +13,8 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "db": "node build.cjs",
-    "make:darwin": "bare-build --out out/holebooks-darwin-arm64 --host darwin-arm64 --icon holebooks.png --name Holebooks --runtime bare-native/runtime build/index.js",
-    "make:android": "bare-build --out out/android-arm64 --resources resources/android --host android-arm64 --manifest manifest.xml --identifier io.holebooks.app --name Holebooks --runtime bare-native/runtime build/index.js"
+    "make:darwin-arm64": "bare-build --out out/holebooks-darwin-arm64 --host darwin-arm64 --icon holebooks.png --name Holebooks --runtime bare-native/runtime build/index.js",
+    "make:android-arm64": "bare-build --out out/holebooks-android-arm64 --resources resources/android --host android-arm64 --manifest manifest.xml --identifier io.holebooks.app --name Holebooks --runtime bare-native/runtime build/index.js"
   },
   "imports": {
     "path": {

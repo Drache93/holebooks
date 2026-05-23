@@ -10,6 +10,23 @@ interface OLDoc {
 	cover_i?: number
 }
 
+// In Node.js dev mode, globalThis.fetch (18+) is used.
+// In the Bare runtime, bare-fetch must be used — loaded lazily so the
+// native-addon requirement doesn't crash the dev server.
+let _fetchImpl: typeof fetch | null = null
+
+async function outboundFetch(url: string, init?: RequestInit): Promise<Response> {
+	if (!_fetchImpl) {
+		if (typeof globalThis.fetch === 'function') {
+			_fetchImpl = globalThis.fetch
+		} else {
+			const m = await import('bare-fetch' as string) as { default: typeof fetch }
+			_fetchImpl = m.default
+		}
+	}
+	return _fetchImpl(url, init as Parameters<typeof fetch>[1]) as Promise<Response>
+}
+
 export const GET: RequestHandler = async ({ url }) => {
 	const q = url.searchParams.get('q')?.trim()
 	if (!q) error(400, 'Missing query')
@@ -18,7 +35,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	let res: Response
 	try {
-		res = await fetch(olUrl, { headers: { 'User-Agent': 'Holebooks/1.0' } })
+		res = await outboundFetch(olUrl, { headers: { 'User-Agent': 'Holebooks/1.0' } })
 	} catch {
 		error(502, 'Open Library unreachable')
 	}

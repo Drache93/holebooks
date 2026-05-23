@@ -98,10 +98,12 @@
 						</svg>
 						<input type="search" placeholder="Search by title, author, or ISBN…"
 							class="search-input" bind:value={query} oninput={onInput} />
-						{#if searching}
-							<span class="spinner">…</span>
-						{/if}
 					</div>
+					{#if searching}
+						<div class="search-loader" aria-label="Searching…">
+							<div class="search-loader-bar"></div>
+						</div>
+					{/if}
 
 					{#if candidates.length > 0}
 						<ul class="results">
@@ -132,7 +134,7 @@
 			</div>
 
 			<!-- Book form -->
-			<form method="POST" use:enhance>
+			<form method="POST" enctype="multipart/form-data" use:enhance>
 				{#if form?.error}
 					<div class="error-msg">{form.error}</div>
 				{/if}
@@ -197,7 +199,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 12px 20px;
+		padding: max(12px, env(safe-area-inset-top)) 20px 12px;
 		background: var(--surface);
 		border-bottom: 1px solid var(--border);
 		position: sticky;
@@ -285,13 +287,25 @@
 		box-shadow: 0 0 0 3px var(--accent-dim);
 	}
 
-	.spinner {
-		position: absolute;
-		right: 12px;
-		top: 50%;
-		transform: translateY(-50%);
-		color: var(--text-4);
-		font-size: 0.9rem;
+	.search-loader {
+		height: 3px;
+		border-radius: 0 0 var(--r-sm) var(--r-sm);
+		background: var(--border);
+		overflow: hidden;
+		margin-top: -1px;
+	}
+
+	.search-loader-bar {
+		height: 100%;
+		width: 40%;
+		background: var(--accent);
+		border-radius: 99px;
+		animation: search-sweep 1.1s ease-in-out infinite;
+	}
+
+	@keyframes search-sweep {
+		0%   { transform: translateX(-100%); }
+		100% { transform: translateX(350%); }
 	}
 
 	.results {
@@ -417,6 +431,7 @@
 	}
 
 	.text-input {
+		width: 100%;
 		padding: 10px 12px;
 		border: 1px solid var(--border);
 		border-radius: var(--r-sm);
@@ -437,6 +452,8 @@
 		grid-template-columns: 1fr 100px;
 		gap: 12px;
 	}
+
+	.two-col > * { min-width: 0; }
 
 	/* ── Status picker ── */
 	.status-group {
