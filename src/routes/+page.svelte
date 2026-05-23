@@ -749,10 +749,12 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
+        min-width: 0;
     }
 
     .tile-cover {
         aspect-ratio: 2/3;
+        width: 100%;
         border-radius: var(--r-xs);
         position: relative;
         overflow: hidden;
