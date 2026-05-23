@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "offset": 0,
+  "schema": [
+    {
+      "name": "books",
+      "namespace": "holebooks",
+      "id": 0,
+      "type": 1,
+      "version": 1,
+      "versionField": null,
+      "indexes": [],
+      "schema": "@holebooks/book",
+      "derived": false,
+      "key": [
+        "id"
+      ],
+      "trigger": null
+    }
+  ]
+}

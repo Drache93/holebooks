@@ -10,12 +10,26 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "db": "node build.cjs",
     "make:darwin": "bare-build --out out/holebooks-darwin-arm64 --host darwin-arm64 --icon holebooks.png --name Holebooks --runtime bare-native/runtime build/index.js",
     "make:android": "bare-build --out out/android-arm64 --resources resources/android --host android-arm64 --manifest manifest.xml --identifier io.holebooks.app --name Holebooks --runtime bare-native/runtime build/index.js"
   },
+  "imports": {
+    "path": {
+      "bare": "bare-path",
+      "default": "path"
+    }
+  },
   "devDependencies": {
-    "@sveltejs/kit": "^2.57.0",
-    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@playwright/test": "^1.60.0",
+    "@sveltejs/kit": "^2.60.1",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tailwindcss/forms": "^0.5.11",
+    "@tailwindcss/typography": "^0.5.19",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^25.9.1",
     "bare-build": "^0.5.5",
     "svelte": "^5.55.2",
     "svelte-check": "^4.4.6",
@@ -29,6 +43,12 @@
     "bare-http1": "^4.5.6",
     "bare-module": "^6.2.0",
     "bare-native": "^0.1.2",
-    "bare-process": "^4.4.1"
+    "bare-path": "^3.0.0",
+    "bare-process": "^4.4.1",
+    "bare-storage": "^1.1.0",
+    "corestore": "^7.9.2",
+    "hyperbee2": "^2.10.2",
+    "hyperdb": "^6.7.0",
+    "hyperschema": "^1.21.0"
   }
 }

@@ -1,10 +1,8 @@
 declare global {
 	namespace App {
-		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
+		interface Locals {
+			app: import('$lib/server/app').default | null
+		}
 	}
 }
 

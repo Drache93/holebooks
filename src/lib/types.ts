@@ -13,6 +13,9 @@ export interface Book {
 	genre?: string
 	rating?: number // 1–5
 	notes?: string
+	isbn?: string
+	coverUrl?: string
+	dateStarted?: string
 }
 
 export interface YearStats {

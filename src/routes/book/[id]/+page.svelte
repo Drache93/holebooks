@@ -1,588 +1,1144 @@
 <script lang="ts">
-	import { enhance } from '$app/forms'
-	import type { PageProps } from './$types'
+    import { enhance } from "$app/forms";
+    import { invalidateAll } from "$app/navigation";
+    import { untrack } from "svelte";
+    import type { PageProps } from "./$types";
+    import BookCover from "$lib/BookCover.svelte";
 
-	let { data, form }: PageProps = $props()
+    let { data }: PageProps = $props();
 
-	let book = $state({ ...data.book })
-	$effect(() => {
-		book = { ...data.book }
-	})
+    let book = $state(untrack(() => ({ ...data.book })));
+    $effect(() => {
+        book = { ...data.book };
+    });
 
-	const SPINE_COLORS = [
-		{ bg: '#5c3317', accent: '#8b5e3c', text: '#f5e6d3' },
-		{ bg: '#3d2f1f', accent: '#6b4c30', text: '#eddfc8' },
-		{ bg: '#7b4f2e', accent: '#a07050', text: '#f5e6d3' },
-		{ bg: '#4a3020', accent: '#7a5535', text: '#f0dfc5' },
-		{ bg: '#6e3a20', accent: '#9c5e3a', text: '#f5e0cc' },
-		{ bg: '#2e2418', accent: '#5a4230', text: '#e8d8c0' },
-		{ bg: '#8b5e30', accent: '#b07840', text: '#f5e8d0' },
-		{ bg: '#4c2e10', accent: '#7a5028', text: '#ecd8bc' }
-	]
+    const SPINE = [
+        { bg: "#1E3A5F", accent: "#2E5A8F", text: "#C8DAEA" },
+        { bg: "#2D4A2A", accent: "#4A7A44", text: "#C4DCC0" },
+        { bg: "#4A2040", accent: "#7A3A65", text: "#E4C4D8" },
+        { bg: "#3A2A10", accent: "#6A5020", text: "#DCCCA0" },
+        { bg: "#1A3A4A", accent: "#2A6A7A", text: "#B8D8E4" },
+        { bg: "#3A1A1A", accent: "#7A3030", text: "#E4C4C4" },
+        { bg: "#2A3040", accent: "#4A5570", text: "#C4CCE0" },
+        { bg: "#1A3A30", accent: "#2A6A58", text: "#B8E0D8" },
+    ];
 
-	function bookColor(id: string) {
-		let h = 0
-		for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffff
-		return SPINE_COLORS[h % SPINE_COLORS.length]
-	}
+    function bookColor(id: string) {
+        let h = 0;
+        for (let i = 0; i < id.length; i++)
+            h = (h * 31 + id.charCodeAt(i)) & 0xffff;
+        return SPINE[h % SPINE.length];
+    }
 
-	function initials(title: string) {
-		return title
-			.split(' ')
-			.filter((w) => w.length > 2)
-			.slice(0, 2)
-			.map((w) => w[0].toUpperCase())
-			.join('')
-	}
+    const color = $derived(bookColor(book.id));
 
-	const color = $derived(bookColor(book.id))
+    let pagesInput = $state(untrack(() => String(data.book.pagesRead ?? 0)));
+    let pctInput = $state(untrack(() => String(data.book.progress ?? 0)));
+    let notesInput = $state(untrack(() => data.book.notes ?? ""));
+    let hoverRating = $state(0);
+    let pendingRating = $state(untrack(() => data.book.rating ?? 0));
+    let noteSaved = $state(false);
+    let progressSaved = $state(false);
+    let submitting = $state(false);
+    let editOpen = $state(false);
+    let editTitle = $state(untrack(() => data.book.title));
+    let editAuthor = $state(untrack(() => data.book.author));
+    let editGenre = $state(untrack(() => data.book.genre ?? ""));
+    let editPages = $state(untrack(() => String(data.book.totalPages ?? "")));
+    let confirmDelete = $state(false);
+    let finishDate = $state(new Date().toISOString().slice(0, 10));
+    let showDatePicker = $state(false);
+    let actionError = $state<string | null>(null);
 
-	let pagesInput = $state(String(book.pagesRead ?? 0))
-	let notesInput = $state(book.notes ?? '')
-	let hoverRating = $state(0)
-	let pendingRating = $state(book.rating ?? 0)
-	let noteSaved = $state(false)
-	let progressSaved = $state(false)
+    $effect(() => {
+        pagesInput = String(book.pagesRead ?? 0);
+        pctInput = String(book.progress ?? 0);
+        notesInput = book.notes ?? "";
+        pendingRating = book.rating ?? 0;
+        editTitle = book.title;
+        editAuthor = book.author;
+        editGenre = book.genre ?? "";
+        editPages = String(book.totalPages ?? "");
+    });
 
-	$effect(() => {
-		pagesInput = String(book.pagesRead ?? 0)
-		notesInput = book.notes ?? ''
-		pendingRating = book.rating ?? 0
-	})
+    const statusLabel = $derived(
+        book.status === "reading"
+            ? "Reading"
+            : book.status === "read"
+              ? "Finished"
+              : "Want to read",
+    );
+
+    function showError(msg: string) {
+        actionError = msg;
+        setTimeout(() => (actionError = null), 4000);
+    }
+
+    function mkEnhance(onSuccess?: () => void) {
+        return () =>
+            async ({ result, update }: any) => {
+                if (result.type === "failure" || result.type === "error") {
+                    showError(
+                        result.data?.message ??
+                            "Something went wrong — check the console",
+                    );
+                    return;
+                }
+                await update({ reset: false });
+                onSuccess?.();
+            };
+    }
+
+    // Quick-add pages — auto-submits directly via fetch
+    async function quickAdd(delta: number) {
+        if (submitting) return;
+        submitting = true;
+        const current = book.pagesRead ?? 0;
+        const max = book.totalPages ?? 9999;
+        const newPages = Math.min(max, Math.max(0, current + delta));
+        pagesInput = String(newPages);
+
+        const fd = new FormData();
+        fd.set("pagesRead", String(newPages));
+
+        try {
+            const res = await fetch(`?/updateProgress`, {
+                method: "POST",
+                body: fd,
+            });
+            if (res.ok) {
+                await invalidateAll();
+                progressSaved = true;
+                setTimeout(() => (progressSaved = false), 2000);
+            } else {
+                showError("Failed to save — try again");
+            }
+        } catch {
+            showError("Network error");
+        } finally {
+            submitting = false;
+        }
+    }
 </script>
 
 <div class="page">
-	<!-- Back nav -->
-	<nav>
-		<a href="/" class="back-btn">
-			<span class="back-arrow">←</span>
-			<span>Shelf</span>
-		</a>
-		<span class="status-chip" class:reading={book.status === 'reading'} class:read={book.status === 'read'} class:planned={book.status === 'planned'}>
-			{book.status === 'reading' ? 'Reading' : book.status === 'read' ? 'Finished' : 'Planned'}
-		</span>
-	</nav>
+    <!-- ── Nav bar ── -->
+    <nav class="topnav">
+        <a href="/" class="back">
+            <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                aria-hidden="true"
+            >
+                <path
+                    d="M10 13L5 8l5-5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+            </svg>
+            Shelf
+        </a>
+        <span
+            class="status-pill"
+            class:reading={book.status === "reading"}
+            class:read={book.status === "read"}
+            class:planned={book.status === "planned"}
+        >
+            {statusLabel}
+        </span>
+    </nav>
 
-	<!-- Hero -->
-	<div class="hero">
-		<div class="cover-wrap">
-			<div class="cover-lg" style="background: {color.bg}">
-				<div class="cover-pattern" style="border-color: {color.accent}"></div>
-				<span class="cover-initials" style="color: {color.text}">{initials(book.title)}</span>
-				{#if book.status === 'read'}
-					<div class="cover-badge-lg">✓</div>
-				{/if}
-			</div>
-		</div>
-		<div class="hero-info">
-			<h1 class="book-title">{book.title}</h1>
-			<p class="book-author">{book.author}</p>
-			{#if book.genre}
-				<p class="book-genre">{book.genre}</p>
-			{/if}
-			{#if book.totalPages}
-				<p class="book-pages">{book.totalPages} pages</p>
-			{/if}
-			{#if book.dateRead}
-				<p class="book-date">Finished {book.dateRead}</p>
-			{/if}
-		</div>
-	</div>
+    {#if actionError}
+        <div class="action-error">{actionError}</div>
+    {/if}
 
-	<!-- Progress (if reading) -->
-	{#if book.status === 'reading'}
-		<section class="card">
-			<h2 class="card-heading">Reading Progress</h2>
+    <!-- ── Hero ── -->
+    <div class="hero">
+        <div class="hero-inner">
+            <div class="cover-box" style="background:{color.bg}">
+                <BookCover
+                    title={book.title}
+                    {color}
+                    coverUrl={book.coverUrl}
+                />
+                {#if book.status === "read"}
+                    <span class="cover-check">✓</span>
+                {/if}
+            </div>
+            <div class="hero-meta">
+                <h1 class="hero-title">{book.title}</h1>
+                <p class="hero-author">{book.author}</p>
+                <div class="hero-tags">
+                    {#if book.genre}<span class="tag">{book.genre}</span>{/if}
+                    {#if book.totalPages}<span class="tag"
+                            >{book.totalPages} pages</span
+                        >{/if}
+                </div>
+                {#if book.dateStarted}<p class="hero-date">
+                        Started {book.dateStarted}
+                    </p>{/if}
+                {#if book.dateRead}<p class="hero-date">
+                        Finished {book.dateRead}
+                    </p>{/if}
+            </div>
+        </div>
+    </div>
 
-			<div class="progress-bar-lg">
-				<div class="progress-fill-lg" style="width: {book.progress}%"></div>
-			</div>
-			<p class="progress-label">{book.progress}% complete</p>
+    <!-- ── Cards ── -->
+    <div class="cards-area">
+        <div class="cards-col main-col">
+            <!-- ── Reading Progress (redesigned stepper) ── -->
+            {#if book.status === "reading"}
+                <div class="card anim">
+                    <p class="card-label">Reading Progress</p>
 
-			<form
-				method="POST"
-				action="?/updateProgress"
-				use:enhance={() =>
-					async ({ update }) => {
-						await update({ reset: false })
-						progressSaved = true
-						setTimeout(() => (progressSaved = false), 2000)
-					}}
-			>
-				<div class="input-row">
-					<label for="pagesRead" class="input-label">Pages read</label>
-					<div class="input-group">
-						<input
-							id="pagesRead"
-							name="pagesRead"
-							type="number"
-							min="0"
-							max={book.totalPages}
-							bind:value={pagesInput}
-							class="num-input"
-						/>
-						{#if book.totalPages}
-							<span class="input-suffix">/ {book.totalPages}</span>
-						{/if}
-					</div>
-				</div>
-				<button type="submit" class="btn-primary">
-					{progressSaved ? 'Saved!' : 'Update progress'}
-				</button>
-			</form>
-		</section>
+                    <!-- Big progress bar -->
+                    <div class="prog-bar-big">
+                        <div
+                            class="prog-fill-big"
+                            style="width:{book.progress}%"
+                        ></div>
+                    </div>
 
-		<!-- Mark as read -->
-		<section class="card">
-			<h2 class="card-heading">Finished?</h2>
-			<form
-				method="POST"
-				action="?/markRead"
-				use:enhance={() =>
-					async ({ update }) => {
-						await update()
-					}}
-			>
-				<p class="card-hint">Mark this book as read and record your rating.</p>
-				<div class="rating-row">
-					{#each [1, 2, 3, 4, 5] as s}
-						<button
-							type="button"
-							class="star-btn"
-							class:active={s <= (hoverRating || pendingRating)}
-							onmouseenter={() => (hoverRating = s)}
-							onmouseleave={() => (hoverRating = 0)}
-							onclick={() => (pendingRating = s)}
-							aria-label="{s} star"
-						>
-							★
-						</button>
-					{/each}
-				</div>
-				<input type="hidden" name="rating" value={pendingRating || ''} />
-				<button type="submit" class="btn-finish">Mark as finished</button>
-			</form>
-		</section>
-	{/if}
+                    <!-- Page count + percentage -->
+                    <div class="prog-count-row">
+                        <div class="prog-count">
+                            <span class="prog-n">{book.pagesRead ?? 0}</span>
+                            {#if book.totalPages}
+                                <span class="prog-total">
+                                    / {book.totalPages} pages</span
+                                >
+                            {:else}
+                                <span class="prog-total"> pages read</span>
+                            {/if}
+                        </div>
+                        <span class="prog-pct-big">{book.progress}%</span>
+                    </div>
 
-	<!-- Start reading (if planned) -->
-	{#if book.status === 'planned'}
-		<section class="card">
-			<h2 class="card-heading">Ready to start?</h2>
-			<p class="card-hint">Move this to your current reads.</p>
-			<form
-				method="POST"
-				action="?/startReading"
-				use:enhance={() =>
-					async ({ update }) => {
-						await update()
-					}}
-			>
-				<button type="submit" class="btn-primary">Start reading</button>
-			</form>
-		</section>
-	{/if}
+                    <!-- Quick-add buttons -->
+                    {#if book.totalPages}
+                        <div class="quick-add-row">
+                            {#each [1, 5, 10, 25, 50] as delta}
+                                {@const atMax =
+                                    (book.pagesRead ?? 0) >=
+                                    (book.totalPages ?? 0)}
+                                <button
+                                    type="button"
+                                    class="qa-btn"
+                                    disabled={submitting || atMax}
+                                    onclick={() => quickAdd(delta)}
+                                    >+{delta}</button
+                                >
+                            {/each}
+                        </div>
+                    {/if}
 
-	<!-- Rating (if read) -->
-	{#if book.status === 'read'}
-		<section class="card">
-			<h2 class="card-heading">Your rating</h2>
-			<form
-				method="POST"
-				action="?/setRating"
-				use:enhance={() =>
-					async ({ update }) => {
-						await update({ reset: false })
-					}}
-			>
-				<div class="rating-row">
-					{#each [1, 2, 3, 4, 5] as s}
-						<button
-							type="button"
-							class="star-btn"
-							class:active={s <= (hoverRating || pendingRating)}
-							onmouseenter={() => (hoverRating = s)}
-							onmouseleave={() => (hoverRating = 0)}
-							onclick={() => (pendingRating = s)}
-							aria-label="{s} star"
-						>
-							★
-						</button>
-					{/each}
-				</div>
-				<input type="hidden" name="rating" value={pendingRating} />
-				<button type="submit" class="btn-primary btn-sm">Save rating</button>
-			</form>
-		</section>
-	{/if}
+                    <!-- Manual input -->
+                    <form
+                        method="POST"
+                        action="?/updateProgress"
+                        use:enhance={mkEnhance(() => {
+                            progressSaved = true;
+                            setTimeout(() => (progressSaved = false), 2000);
+                        })}
+                    ></form>
+                </div>
 
-	<!-- Notes -->
-	<section class="card">
-		<h2 class="card-heading">Notes</h2>
-		<form
-			method="POST"
-			action="?/saveNotes"
-			use:enhance={() =>
-				async ({ update }) => {
-					await update({ reset: false })
-					noteSaved = true
-					setTimeout(() => (noteSaved = false), 2000)
-				}}
-		>
-			<textarea
-				name="notes"
-				placeholder="Your thoughts, quotes, reflections…"
-				rows="5"
-				class="notes-input"
-				bind:value={notesInput}
-			></textarea>
-			<button type="submit" class="btn-primary">
-				{noteSaved ? 'Saved!' : 'Save notes'}
-			</button>
-		</form>
-	</section>
+                <!-- Mark as finished -->
+                <div class="card anim">
+                    <p class="card-label">Mark as finished</p>
+                    <form
+                        method="POST"
+                        action="?/markRead"
+                        use:enhance={mkEnhance()}
+                    >
+                        <div class="stars-row">
+                            {#each [1, 2, 3, 4, 5] as s}
+                                <button
+                                    type="button"
+                                    class="star"
+                                    class:on={s <=
+                                        (hoverRating || pendingRating)}
+                                    onmouseenter={() => (hoverRating = s)}
+                                    onmouseleave={() => (hoverRating = 0)}
+                                    onclick={() => (pendingRating = s)}
+                                    aria-label="{s} star">★</button
+                                >
+                            {/each}
+                        </div>
+                        <input
+                            type="hidden"
+                            name="rating"
+                            value={pendingRating || ""}
+                        />
 
-	<div class="bottom-pad"></div>
+                        <div class="date-toggle-row">
+                            <button
+                                type="button"
+                                class="text-link"
+                                onclick={() =>
+                                    (showDatePicker = !showDatePicker)}
+                            >
+                                {showDatePicker
+                                    ? "Use today"
+                                    : "Set a different date"}
+                            </button>
+                            {#if showDatePicker}
+                                <input
+                                    type="date"
+                                    name="dateRead"
+                                    class="date-input"
+                                    bind:value={finishDate}
+                                />
+                            {/if}
+                        </div>
+
+                        <button class="btn-green">Mark as finished</button>
+                    </form>
+                </div>
+
+                <!-- Pause reading -->
+                <div class="card card-flat anim">
+                    <p class="card-label">Pause reading</p>
+                    <p class="card-hint">Move back to your Want to Read list</p>
+                    <form
+                        method="POST"
+                        action="?/stopReading"
+                        use:enhance={mkEnhance()}
+                    >
+                        <button class="btn-ghost">Stop reading</button>
+                    </form>
+                </div>
+            {/if}
+
+            <!-- Start reading -->
+            {#if book.status === "planned"}
+                <div class="card anim">
+                    <p class="card-label">Ready to start?</p>
+                    <p class="card-hint">Move this to your current reads</p>
+                    <form
+                        method="POST"
+                        action="?/startReading"
+                        use:enhance={mkEnhance()}
+                    >
+                        <button class="btn-primary">Start reading</button>
+                    </form>
+                </div>
+            {/if}
+
+            <!-- Rating (for read books) -->
+            {#if book.status === "read"}
+                <div class="card anim">
+                    <p class="card-label">Your rating</p>
+                    <form
+                        method="POST"
+                        action="?/setRating"
+                        use:enhance={mkEnhance()}
+                    >
+                        <div class="stars-row">
+                            {#each [1, 2, 3, 4, 5] as s}
+                                <button
+                                    type="button"
+                                    class="star"
+                                    class:on={s <=
+                                        (hoverRating || pendingRating)}
+                                    onmouseenter={() => (hoverRating = s)}
+                                    onmouseleave={() => (hoverRating = 0)}
+                                    onclick={() => (pendingRating = s)}
+                                    aria-label="{s} star">★</button
+                                >
+                            {/each}
+                        </div>
+                        <input
+                            type="hidden"
+                            name="rating"
+                            value={pendingRating}
+                        />
+                        <button class="btn-primary btn-sm">Save rating</button>
+                    </form>
+                </div>
+            {/if}
+
+            <!-- Notes -->
+            <div class="card anim">
+                <p class="card-label">Notes</p>
+                <form
+                    method="POST"
+                    action="?/saveNotes"
+                    use:enhance={mkEnhance(() => {
+                        noteSaved = true;
+                        setTimeout(() => (noteSaved = false), 2000);
+                    })}
+                >
+                    <textarea
+                        name="notes"
+                        rows="5"
+                        placeholder="Thoughts, quotes, reflections…"
+                        class="notes-ta"
+                        bind:value={notesInput}
+                    ></textarea>
+                    <button class="btn-primary"
+                        >{noteSaved ? "Saved ✓" : "Save notes"}</button
+                    >
+                </form>
+            </div>
+        </div>
+
+        <!-- ── Side column ── -->
+        <div class="cards-col side-col">
+            <!-- Edit details -->
+            <div class="card anim">
+                <button
+                    class="expand-toggle"
+                    onclick={() => (editOpen = !editOpen)}
+                    aria-expanded={editOpen}
+                >
+                    <span class="card-label" style="margin:0">Book details</span
+                    >
+                    <svg
+                        class="chevron"
+                        class:open={editOpen}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                    >
+                        <path
+                            d="M6 4l4 4-4 4"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                </button>
+
+                {#if editOpen}
+                    <form
+                        method="POST"
+                        action="?/editDetails"
+                        style="margin-top:16px"
+                        use:enhance={mkEnhance(() => {
+                            editOpen = false;
+                        })}
+                    >
+                        <div class="edit-field">
+                            <label for="ed-title">Title</label>
+                            <input
+                                id="ed-title"
+                                name="title"
+                                type="text"
+                                required
+                                class="text-input"
+                                bind:value={editTitle}
+                            />
+                        </div>
+                        <div class="edit-field">
+                            <label for="ed-author">Author</label>
+                            <input
+                                id="ed-author"
+                                name="author"
+                                type="text"
+                                required
+                                class="text-input"
+                                bind:value={editAuthor}
+                            />
+                        </div>
+                        <div class="edit-field">
+                            <label for="ed-genre">Genre</label>
+                            <input
+                                id="ed-genre"
+                                name="genre"
+                                type="text"
+                                class="text-input"
+                                bind:value={editGenre}
+                            />
+                        </div>
+                        <div class="edit-field">
+                            <label for="ed-pages">Total pages</label>
+                            <input
+                                id="ed-pages"
+                                name="totalPages"
+                                type="number"
+                                min="1"
+                                class="text-input num-sm"
+                                bind:value={editPages}
+                            />
+                        </div>
+                        <button class="btn-primary">Save changes</button>
+                    </form>
+                {/if}
+            </div>
+
+            <!-- Delete -->
+            <div class="delete-area">
+                {#if !confirmDelete}
+                    <button
+                        class="del-trigger"
+                        onclick={() => (confirmDelete = true)}
+                        >Remove from shelf</button
+                    >
+                {:else}
+                    <div class="del-confirm-box">
+                        <p class="del-text">Remove <em>{book.title}</em>?</p>
+                        <div class="del-actions">
+                            <button
+                                class="btn-ghost btn-sm"
+                                onclick={() => (confirmDelete = false)}
+                                >Cancel</button
+                            >
+                            <form method="POST" action="?/delete">
+                                <button class="btn-danger btn-sm">Remove</button
+                                >
+                            </form>
+                        </div>
+                    </div>
+                {/if}
+            </div>
+        </div>
+    </div>
+
+    <div style="height:48px"></div>
 </div>
 
 <style>
-	.page {
-		min-height: 100dvh;
-		background: var(--cream-light);
-		padding-bottom: env(safe-area-inset-bottom);
-	}
+    .page {
+        min-height: 100dvh;
+        background: var(--bg);
+    }
 
-	/* ── Nav ── */
-	nav {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 14px 16px;
-		background: var(--brown-dark);
-	}
+    /* ── Nav ── */
+    .topnav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px var(--page-pad);
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
 
-	.back-btn {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		color: var(--cream-light);
-		font-size: 0.9rem;
-		padding: 6px 10px;
-		border-radius: var(--radius-sm);
-		transition: background 0.15s;
-	}
+    .back {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--text-3);
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: color 0.15s;
+    }
 
-	.back-btn:active {
-		background: rgba(255, 255, 255, 0.1);
-	}
+    .back:hover {
+        color: var(--accent);
+    }
 
-	.back-arrow {
-		font-size: 1.1rem;
-	}
+    .status-pill {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 4px 12px;
+        border-radius: 99px;
+        background: var(--border);
+        color: var(--text-3);
+    }
 
-	.status-chip {
-		font-size: 0.72rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		padding: 4px 10px;
-		border-radius: 99px;
-	}
+    .status-pill.reading {
+        background: var(--accent-dim);
+        color: var(--accent);
+    }
+    .status-pill.read {
+        background: var(--green-dim);
+        color: var(--green);
+    }
+    .status-pill.planned {
+        background: var(--border);
+        color: var(--text-3);
+    }
 
-	.status-chip.reading {
-		background: var(--reading-accent);
-		color: #fff;
-	}
+    /* ── Error banner ── */
+    .action-error {
+        padding: 10px var(--page-pad);
+        background: #fef2f2;
+        border-bottom: 1px solid #fecaca;
+        color: #dc2626;
+        font-size: 0.875rem;
+    }
 
-	.status-chip.read {
-		background: var(--read-accent);
-		color: #fff;
-	}
+    /* ── Hero ── */
+    .hero {
+        background: #1a2332;
+    }
 
-	.status-chip.planned {
-		background: var(--brown-light);
-		color: #fff;
-	}
+    .hero-inner {
+        max-width: var(--page-max);
+        margin-inline: auto;
+        padding: 28px var(--page-pad);
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+    }
 
-	/* ── Hero ── */
-	.hero {
-		display: flex;
-		gap: 20px;
-		padding: 24px 20px;
-		background: linear-gradient(180deg, var(--brown-dark) 0%, var(--cream-light) 100%);
-	}
+    @media (min-width: 700px) {
+        .hero-inner {
+            padding-top: 40px;
+            padding-bottom: 40px;
+            gap: 36px;
+        }
+    }
 
-	.cover-wrap {
-		flex-shrink: 0;
-	}
+    .cover-box {
+        width: 100px;
+        height: 150px;
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: var(--shadow-book);
+    }
 
-	.cover-lg {
-		width: 110px;
-		height: 165px;
-		border-radius: var(--radius-sm);
-		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-shadow:
-			4px 6px 20px rgba(0, 0, 0, 0.4),
-			inset -3px 0 6px rgba(0, 0, 0, 0.2);
-		overflow: hidden;
-	}
+    @media (min-width: 700px) {
+        .cover-box {
+            width: 130px;
+            height: 195px;
+        }
+    }
 
-	.cover-pattern {
-		position: absolute;
-		inset: 8px;
-		border: 1px solid;
-		border-radius: 2px;
-		opacity: 0.35;
-		pointer-events: none;
-	}
+    .cover-check {
+        position: absolute;
+        bottom: 7px;
+        right: 7px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--green);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        font-weight: 800;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        z-index: 2;
+    }
 
-	.cover-initials {
-		font-size: 2.5rem;
-		font-weight: 700;
-		letter-spacing: -0.02em;
-		z-index: 1;
-		opacity: 0.85;
-		user-select: none;
-	}
+    .hero-meta {
+        padding-top: 4px;
+        flex: 1;
+        min-width: 0;
+    }
 
-	.cover-badge-lg {
-		position: absolute;
-		bottom: 8px;
-		right: 8px;
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-		background: var(--read-accent);
-		color: #fff;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.75rem;
-		font-weight: 700;
-		z-index: 2;
-	}
+    .hero-title {
+        margin: 0 0 5px;
+        font-family: var(--font-serif);
+        font-size: 1.4rem;
+        font-weight: 600;
+        line-height: 1.25;
+        color: #fff;
+    }
 
-	.hero-info {
-		flex: 1;
-		padding-top: 8px;
-		min-width: 0;
-	}
+    @media (min-width: 700px) {
+        .hero-title {
+            font-size: 1.8rem;
+        }
+    }
 
-	h1.book-title {
-		margin: 0 0 4px;
-		font-size: 1.2rem;
-		font-weight: 700;
-		line-height: 1.3;
-		color: var(--cream-lightest);
-	}
+    .hero-author {
+        margin: 0 0 10px;
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.6);
+        font-weight: 500;
+    }
 
-	.book-author {
-		margin: 0 0 4px;
-		font-size: 0.85rem;
-		color: var(--brown-pale);
-	}
+    .hero-tags {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+    }
 
-	.book-genre {
-		margin: 0 0 6px;
-		font-size: 0.75rem;
-		color: var(--brown-pale);
-		font-style: italic;
-	}
+    .tag {
+        display: inline-block;
+        padding: 3px 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 99px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.65);
+    }
 
-	.book-pages {
-		margin: 0 0 2px;
-		font-size: 0.75rem;
-		color: var(--cream-dark);
-		opacity: 0.75;
-	}
+    .hero-date {
+        margin: 2px 0 0;
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.45);
+    }
 
-	.book-date {
-		margin: 0;
-		font-size: 0.75rem;
-		color: var(--brown-pale);
-		opacity: 0.8;
-	}
+    /* ── Cards layout ── */
+    .cards-area {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: 20px var(--page-pad);
+        max-width: var(--page-max);
+        margin-inline: auto;
+    }
 
-	/* ── Cards ── */
-	.card {
-		margin: 12px 16px 0;
-		background: var(--cream-lightest);
-		border: 1px solid var(--border-light);
-		border-radius: var(--radius-lg);
-		padding: 18px;
-		box-shadow: 0 1px 4px var(--shadow);
-	}
+    @media (min-width: 700px) {
+        .cards-area {
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 24px;
+            padding-top: 28px;
+            padding-bottom: 28px;
+        }
 
-	.card-heading {
-		margin: 0 0 14px;
-		font-size: 0.85rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--brown-mid);
-	}
+        .main-col {
+            flex: 1;
+            min-width: 0;
+        }
+        .side-col {
+            width: 300px;
+            flex-shrink: 0;
+        }
+    }
 
-	.card-hint {
-		margin: 0 0 12px;
-		font-size: 0.85rem;
-		color: var(--text-muted);
-	}
+    .cards-col {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
 
-	/* ── Progress bar ── */
-	.progress-bar-lg {
-		height: 8px;
-		background: var(--cream-dark);
-		border-radius: 99px;
-		overflow: hidden;
-		margin-bottom: 6px;
-	}
+    /* ── Card ── */
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        padding: 20px;
+        box-shadow: var(--shadow-xs);
+    }
 
-	.progress-fill-lg {
-		height: 100%;
-		background: var(--reading-accent);
-		border-radius: 99px;
-		transition: width 0.4s ease;
-	}
+    .card-flat {
+        background: var(--surface-2);
+        box-shadow: none;
+    }
 
-	.progress-label {
-		margin: 0 0 14px;
-		font-size: 0.8rem;
-		color: var(--text-muted);
-	}
+    .card-label {
+        margin: 0 0 14px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-3);
+    }
 
-	/* ── Inputs ── */
-	.input-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 12px;
-		gap: 12px;
-	}
+    .card-hint {
+        margin: -8px 0 12px;
+        font-size: 0.85rem;
+        color: var(--text-3);
+    }
 
-	.input-label {
-		font-size: 0.85rem;
-		color: var(--text-muted);
-	}
+    /* ── Progress stepper ── */
+    .prog-bar-big {
+        height: 10px;
+        background: var(--border);
+        border-radius: 99px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
 
-	.input-group {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
+    .prog-fill-big {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 99px;
+        transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
 
-	.num-input {
-		width: 80px;
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		background: var(--cream-light);
-		color: var(--text);
-		font-size: 0.9rem;
-		text-align: right;
-	}
+    .prog-count-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
 
-	.num-input:focus {
-		outline: 2px solid var(--brown-light);
-		outline-offset: 1px;
-	}
+    .prog-count {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+    }
 
-	.input-suffix {
-		font-size: 0.8rem;
-		color: var(--text-faint);
-	}
+    .prog-n {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+    }
 
-	/* ── Buttons ── */
-	.btn-primary {
-		width: 100%;
-		padding: 12px;
-		background: var(--brown-mid);
-		color: var(--cream-lightest);
-		border: none;
-		border-radius: var(--radius);
-		font-size: 0.9rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		transition:
-			background 0.15s,
-			transform 0.1s;
-	}
+    .prog-total {
+        font-size: 0.9rem;
+        color: var(--text-3);
+        font-weight: 500;
+    }
 
-	.btn-primary:active {
-		background: var(--brown-dark);
-		transform: scale(0.99);
-	}
+    .prog-pct-big {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+    }
 
-	.btn-primary.btn-sm {
-		padding: 8px 16px;
-		width: auto;
-		font-size: 0.8rem;
-	}
+    .quick-add-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
 
-	.btn-finish {
-		width: 100%;
-		padding: 12px;
-		background: var(--read-accent);
-		color: #fff;
-		border: none;
-		border-radius: var(--radius);
-		font-size: 0.9rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		transition: background 0.15s;
-	}
+    .qa-btn {
+        flex: 1;
+        padding: 11px 4px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-2);
+        cursor: pointer;
+        transition:
+            background 0.12s,
+            border-color 0.12s,
+            color 0.12s,
+            transform 0.1s;
+    }
 
-	.btn-finish:active {
-		background: #47612d;
-	}
+    .qa-btn:not([disabled]):hover {
+        background: var(--accent-light);
+        border-color: var(--accent);
+        color: var(--accent);
+    }
 
-	/* ── Stars ── */
-	.rating-row {
-		display: flex;
-		gap: 8px;
-		margin-bottom: 14px;
-	}
+    .qa-btn:not([disabled]):active {
+        transform: scale(0.95);
+    }
 
-	.star-btn {
-		font-size: 2rem;
-		background: none;
-		border: none;
-		padding: 0;
-		color: var(--cream-dark);
-		transition: color 0.1s, transform 0.1s;
-		line-height: 1;
-	}
+    .qa-btn[disabled] {
+        opacity: 0.35;
+        cursor: default;
+    }
 
-	.star-btn.active {
-		color: var(--brown-light);
-	}
+    .manual-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+    }
 
-	.star-btn:active {
-		transform: scale(1.2);
-	}
+    .manual-label {
+        font-size: 0.76rem;
+        color: var(--text-4);
+        flex-shrink: 0;
+    }
 
-	/* ── Notes ── */
-	.notes-input {
-		width: 100%;
-		padding: 10px 12px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		background: var(--cream-light);
-		color: var(--text);
-		font-size: 0.875rem;
-		line-height: 1.6;
-		resize: vertical;
-		margin-bottom: 12px;
-	}
+    .num-input {
+        width: 80px;
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-xs);
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: 0.9rem;
+        text-align: right;
+        outline: none;
+        transition: border-color 0.15s;
+    }
 
-	.notes-input:focus {
-		outline: 2px solid var(--brown-light);
-		outline-offset: 1px;
-	}
+    .num-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-dim);
+    }
 
-	.bottom-pad {
-		height: 40px;
-	}
+    .num-suffix {
+        font-size: 0.8rem;
+        color: var(--text-4);
+        flex-shrink: 0;
+    }
+
+    /* ── Stars ── */
+    .stars-row {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 14px;
+    }
+
+    .star {
+        font-size: 2rem;
+        background: none;
+        border: none;
+        padding: 0 2px;
+        color: var(--border);
+        transition:
+            color 0.1s,
+            transform 0.1s;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .star.on {
+        color: var(--accent);
+    }
+    .star:active {
+        transform: scale(1.2);
+    }
+
+    /* ── Date toggle ── */
+    .date-toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+
+    .text-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 0.8rem;
+        color: var(--accent);
+        text-decoration: underline;
+        cursor: pointer;
+    }
+
+    .date-input {
+        padding: 5px 9px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-xs);
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: 0.82rem;
+        outline: none;
+    }
+
+    .date-input:focus {
+        border-color: var(--accent);
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+        width: 100%;
+        padding: 11px 16px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--r-sm);
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        transition:
+            opacity 0.15s,
+            transform 0.1s;
+        cursor: pointer;
+    }
+
+    .btn-primary:hover {
+        opacity: 0.9;
+    }
+    .btn-primary:active {
+        transform: scale(0.99);
+    }
+
+    .btn-primary.btn-sm {
+        width: auto;
+        padding: 8px 14px;
+        font-size: 0.82rem;
+    }
+
+    .btn-green {
+        width: 100%;
+        padding: 11px 16px;
+        background: var(--green);
+        color: #fff;
+        border: none;
+        border-radius: var(--r-sm);
+        font-size: 0.9rem;
+        font-weight: 700;
+        transition: opacity 0.15s;
+        cursor: pointer;
+    }
+
+    .btn-green:hover {
+        opacity: 0.9;
+    }
+
+    .btn-ghost {
+        width: 100%;
+        padding: 10px 16px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm);
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-3);
+        transition:
+            background 0.15s,
+            border-color 0.15s;
+        cursor: pointer;
+    }
+
+    .btn-ghost:hover {
+        background: var(--border-2);
+        border-color: var(--text-4);
+    }
+
+    .btn-ghost.btn-sm {
+        width: auto;
+        padding: 7px 14px;
+        font-size: 0.8rem;
+    }
+
+    .btn-danger {
+        padding: 7px 14px;
+        background: #dc2626;
+        color: #fff;
+        border: none;
+        border-radius: var(--r-sm);
+        font-size: 0.8rem;
+        font-weight: 700;
+        transition: opacity 0.15s;
+        cursor: pointer;
+    }
+
+    .btn-danger:hover {
+        opacity: 0.9;
+    }
+
+    /* ── Notes ── */
+    .notes-ta {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm);
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: 0.9rem;
+        line-height: 1.6;
+        resize: vertical;
+        margin-bottom: 12px;
+        outline: none;
+        transition: border-color 0.15s;
+        box-sizing: border-box;
+    }
+
+    .notes-ta:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
+    /* ── Edit details ── */
+    .expand-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    .chevron {
+        color: var(--text-4);
+        transition: transform 0.2s;
+        flex-shrink: 0;
+    }
+
+    .chevron.open {
+        transform: rotate(90deg);
+    }
+
+    .edit-field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-bottom: 12px;
+    }
+
+    .edit-field label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--text-3);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .text-input {
+        padding: 9px 11px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-xs);
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: 0.875rem;
+        outline: none;
+        transition: border-color 0.15s;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .text-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
+    .num-sm {
+        width: 100px;
+    }
+
+    /* ── Delete area ── */
+    .delete-area {
+        text-align: center;
+        padding: 8px 0 4px;
+    }
+
+    .del-trigger {
+        background: none;
+        border: none;
+        font-size: 0.8rem;
+        color: var(--text-4);
+        text-decoration: underline;
+        cursor: pointer;
+        padding: 4px;
+        transition: color 0.15s;
+    }
+
+    .del-trigger:hover {
+        color: #dc2626;
+    }
+
+    .del-confirm-box {
+        background: var(--surface);
+        border: 1px solid #fecaca;
+        border-radius: var(--r-sm);
+        padding: 14px;
+    }
+
+    .del-text {
+        margin: 0 0 12px;
+        font-size: 0.875rem;
+        color: var(--text-2);
+    }
+
+    .del-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+    }
 </style>

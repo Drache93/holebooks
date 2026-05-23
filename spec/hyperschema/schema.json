@@ -1,0 +1,94 @@
+{
+  "version": 3,
+  "schema": [
+    {
+      "name": "book",
+      "namespace": "holebooks",
+      "compact": false,
+      "flagsPosition": 5,
+      "fields": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "title",
+          "required": true,
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "author",
+          "required": true,
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "status",
+          "required": true,
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "progress",
+          "required": true,
+          "type": "uint",
+          "version": 1
+        },
+        {
+          "name": "pagesRead",
+          "type": "uint",
+          "version": 1
+        },
+        {
+          "name": "totalPages",
+          "type": "uint",
+          "version": 1
+        },
+        {
+          "name": "dateAdded",
+          "required": true,
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "dateRead",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "genre",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "rating",
+          "type": "uint",
+          "version": 1
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "isbn",
+          "type": "string",
+          "version": 2
+        },
+        {
+          "name": "coverUrl",
+          "type": "string",
+          "version": 2
+        },
+        {
+          "name": "dateStarted",
+          "type": "string",
+          "version": 3
+        }
+      ]
+    }
+  ]
+}

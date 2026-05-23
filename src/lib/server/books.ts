@@ -1,8 +1,7 @@
-import type { Book, YearStats } from '$lib/types'
+import type { Book, BookStatus, YearStats } from '$lib/types'
+import type { DB } from '$lib/server/app'
 
-// MVP: in-memory mock — replace body of each function with HyperDB calls later
-
-const store: Book[] = [
+const SEED_BOOKS: Book[] = [
 	{
 		id: '1',
 		title: 'The Remains of the Day',
@@ -108,30 +107,82 @@ const store: Book[] = [
 	}
 ]
 
-export async function getAllBooks(): Promise<Book[]> {
-	return store.map((b) => ({ ...b }))
+function toBook(raw: Record<string, unknown>): Book {
+	return {
+		id: raw.id as string,
+		title: raw.title as string,
+		author: raw.author as string,
+		status: raw.status as BookStatus,
+		progress: raw.progress as number,
+		pagesRead: (raw.pagesRead as number) ?? undefined,
+		totalPages: (raw.totalPages as number) ?? undefined,
+		dateAdded: raw.dateAdded as string,
+		dateRead: (raw.dateRead as string) ?? undefined,
+		genre: (raw.genre as string) ?? undefined,
+		rating: (raw.rating as number) || undefined,
+		notes: (raw.notes as string) ?? undefined,
+		isbn: (raw.isbn as string) ?? undefined,
+		coverUrl: (raw.coverUrl as string) ?? undefined,
+		dateStarted: (raw.dateStarted as string) ?? undefined
+	}
 }
 
-export async function getBook(id: string): Promise<Book | null> {
-	return store.find((b) => b.id === id) ?? null
+export async function seedIfEmpty(db: DB): Promise<void> {
+	const existing = await db.find('@holebooks/books', { gte: {}, lte: {} }).toArray()
+	if (existing.length > 0) return
+	for (const book of SEED_BOOKS) {
+		await db.insert('@holebooks/books', book)
+	}
+	await db.flush()
 }
 
-export async function updateBook(id: string, patch: Partial<Book>): Promise<Book | null> {
-	const idx = store.findIndex((b) => b.id === id)
-	if (idx === -1) return null
-	store[idx] = { ...store[idx], ...patch }
-	return { ...store[idx] }
+export async function getAllBooks(db: DB): Promise<Book[]> {
+	const raws = await db.find('@holebooks/books', { gte: {}, lte: {} }).toArray()
+	return raws.map(toBook)
 }
 
-export function computeYearStats(books: Book[], year = 2026): YearStats {
+export async function getBook(db: DB, id: string): Promise<Book | null> {
+	const raw = await db.get('@holebooks/books', { id })
+	return raw ? toBook(raw) : null
+}
+
+export async function createBook(db: DB, data: Omit<Book, 'id' | 'dateAdded'>): Promise<Book> {
+	const id = crypto.randomUUID()
+	const book: Book = { ...data, id, dateAdded: new Date().toISOString().slice(0, 10) }
+	await db.insert('@holebooks/books', book)
+	await db.flush()
+	return book
+}
+
+export async function updateBook(db: DB, id: string, patch: Partial<Book>): Promise<Book | null> {
+	const existing = await db.get('@holebooks/books', { id })
+	if (!existing) return null
+	// HyperDB has no update() — use insert() which acts as upsert.
+	// Strip undefined values and merge with existing to preserve all required fields.
+	const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined))
+	await db.insert('@holebooks/books', { ...existing, ...clean })
+	await db.flush()
+	return toBook({ ...existing, ...clean })
+}
+
+export async function deleteBook(db: DB, id: string): Promise<boolean> {
+	const existing = await db.get('@holebooks/books', { id })
+	if (!existing) return false
+	await db.delete('@holebooks/books', { id })
+	await db.flush()
+	return true
+}
+
+export function computeYearStats(books: Book[], year = new Date().getFullYear()): YearStats {
+	const readThisYear = books.filter(
+		(b) => b.status === 'read' && b.dateRead?.startsWith(String(year))
+	)
 	return {
 		year,
-		read: books.filter((b) => b.status === 'read').length,
+		read: readThisYear.length,
 		reading: books.filter((b) => b.status === 'reading').length,
 		planned: books.filter((b) => b.status === 'planned').length,
-		pagesRead: books
-			.filter((b) => b.status === 'read')
-			.reduce((sum, b) => sum + (b.pagesRead ?? b.totalPages ?? 0), 0),
+		pagesRead: readThisYear.reduce((sum, b) => sum + (b.pagesRead ?? b.totalPages ?? 0), 0),
 		goal: 20
 	}
 }
