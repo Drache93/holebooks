@@ -1,6 +1,6 @@
 <script lang="ts">
     import { enhance } from "$app/forms";
-    import { invalidateAll } from "$app/navigation";
+    import { invalidateAll, goto } from "$app/navigation";
     import { untrack } from "svelte";
     import type { PageProps } from "./$types";
     import BookCover from "$lib/BookCover.svelte";
@@ -47,6 +47,8 @@
     let editGenre = $state(untrack(() => data.book.genre ?? ""));
     let editPages = $state(untrack(() => String(data.book.totalPages ?? "")));
     let confirmDelete = $state(false);
+    let manualEditOpen = $state(false);
+    let manualPagesInput = $state(untrack(() => String(data.book.pagesRead ?? '')));
     let finishDate = $state(new Date().toISOString().slice(0, 10));
     let showDatePicker = $state(false);
     let actionError = $state<string | null>(null);
@@ -256,15 +258,44 @@
                         </div>
                     {/if}
 
-                    <!-- Manual input -->
-                    <form
-                        method="POST"
-                        action="?/updateProgress"
-                        use:enhance={mkEnhance(() => {
-                            progressSaved = true;
-                            setTimeout(() => (progressSaved = false), 2000);
-                        })}
-                    ></form>
+                    <!-- Manual edit expander -->
+                    <div class="manual-edit-wrap">
+                        <button
+                            type="button"
+                            class="manual-edit-toggle"
+                            onclick={() => (manualEditOpen = !manualEditOpen)}
+                            aria-expanded={manualEditOpen}
+                        >
+                            <svg class="manual-chevron" class:open={manualEditOpen}
+                                width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                <path d="M4 3l4 3-4 3" stroke="currentColor" stroke-width="1.5"
+                                    stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Manually edit
+                        </button>
+                        {#if manualEditOpen}
+                            <div class="manual-edit-body">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    class="text-input num-input-sm"
+                                    bind:value={manualPagesInput}
+                                    placeholder="pages"
+                                />
+                                <button
+                                    type="button"
+                                    class="btn-primary btn-sm"
+                                    onclick={async () => {
+                                        const fd = new FormData()
+                                        fd.set('pagesRead', manualPagesInput)
+                                        const res = await fetch('?/updateProgress', { method: 'POST', body: fd })
+                                        if (res.ok) { await invalidateAll(); manualEditOpen = false }
+                                        else showError('Failed to save')
+                                    }}
+                                >Save</button>
+                            </div>
+                        {/if}
+                    </div>
                 </div>
 
                 <!-- Mark as finished -->
@@ -349,7 +380,7 @@
                 </div>
             {/if}
 
-            <!-- Rating (for read books) -->
+            <!-- Rating + manual pages edit (for read books) -->
             {#if book.status === "read"}
                 <div class="card anim">
                     <p class="card-label">Your rating</p>
@@ -367,6 +398,44 @@
                         {/each}
                         {#if ratingSaved}
                             <span class="rating-saved">Saved ✓</span>
+                        {/if}
+                    </div>
+
+                    <div class="manual-edit-wrap">
+                        <button
+                            type="button"
+                            class="manual-edit-toggle"
+                            onclick={() => (manualEditOpen = !manualEditOpen)}
+                            aria-expanded={manualEditOpen}
+                        >
+                            <svg class="manual-chevron" class:open={manualEditOpen}
+                                width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                <path d="M4 3l4 3-4 3" stroke="currentColor" stroke-width="1.5"
+                                    stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Manually edit pages read
+                        </button>
+                        {#if manualEditOpen}
+                            <div class="manual-edit-body">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    class="text-input num-input-sm"
+                                    bind:value={manualPagesInput}
+                                    placeholder="pages"
+                                />
+                                <button
+                                    type="button"
+                                    class="btn-primary btn-sm"
+                                    onclick={async () => {
+                                        const fd = new FormData()
+                                        fd.set('pagesRead', manualPagesInput)
+                                        const res = await fetch('?/updateProgress', { method: 'POST', body: fd })
+                                        if (res.ok) { await invalidateAll(); manualEditOpen = false }
+                                        else showError('Failed to save')
+                                    }}
+                                >Save</button>
+                            </div>
                         {/if}
                     </div>
                 </div>
@@ -502,7 +571,15 @@
                                 onclick={() => (confirmDelete = false)}
                                 >Cancel</button
                             >
-                            <form method="POST" action="?/delete">
+                            <form method="POST" action="?/delete"
+                                use:enhance={() => async ({ result, update }) => {
+                                    if (result.type === 'failure' || result.type === 'error') {
+                                        showError(result.data?.message ?? 'Could not remove book')
+                                        return
+                                    }
+                                    await update()
+                                    goto('/')
+                                }}>
                                 <button class="btn-danger btn-sm">Remove</button
                                 >
                             </form>
@@ -916,6 +993,59 @@
         color: var(--green);
         align-self: center;
         margin-left: 4px;
+    }
+
+    .manual-edit-wrap {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+    }
+
+    .manual-edit-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 0.78rem;
+        color: var(--text-4);
+        cursor: pointer;
+        transition: color 0.15s;
+    }
+
+    .manual-edit-toggle:hover { color: var(--text-2); }
+
+    .manual-chevron {
+        transition: transform 0.2s;
+        flex-shrink: 0;
+    }
+
+    .manual-chevron.open { transform: rotate(90deg); }
+
+    .manual-edit-body {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .num-input-sm {
+        width: 90px;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-xs);
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: 0.875rem;
+        text-align: right;
+        outline: none;
+        transition: border-color 0.15s;
+    }
+
+    .num-input-sm:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-dim);
     }
 
     /* ── Date toggle ── */

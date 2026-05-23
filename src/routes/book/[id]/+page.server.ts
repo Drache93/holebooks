@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types'
 import { getBook, updateBook, deleteBook } from '$lib/server/books'
-import { error, fail, redirect } from '@sveltejs/kit'
+import { error, fail } from '@sveltejs/kit'
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	await locals.app?.ready()
@@ -145,6 +145,6 @@ export const actions: Actions = {
 			console.error('[delete]', err)
 			return fail(500, { message: err instanceof Error ? err.message : 'Server error' })
 		}
-		redirect(303, '/')
+		return { deleted: true }
 	}
 }
