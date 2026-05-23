@@ -31,7 +31,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	const q = url.searchParams.get('q')?.trim()
 	if (!q) error(400, 'Missing query')
 
-	const olUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=8&fields=title,author_name,isbn,number_of_pages_median,subject,cover_i`
+	const olUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=12&fields=title,author_name,isbn,number_of_pages_median,subject,cover_i`
 
 	let res: Response
 	try {

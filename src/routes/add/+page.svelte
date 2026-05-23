@@ -134,7 +134,7 @@
 			</div>
 
 			<!-- Book form -->
-			<form method="POST" enctype="multipart/form-data" use:enhance>
+			<form method="POST" enctype="multipart/form-data" use:enhance class="form-stack">
 				{#if form?.error}
 					<div class="error-msg">{form.error}</div>
 				{/if}
@@ -233,6 +233,12 @@
 	.body-inner {
 		max-width: 600px;
 		margin-inline: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+
+	.form-stack {
 		display: flex;
 		flex-direction: column;
 		gap: 14px;
@@ -360,7 +366,10 @@
 		font-size: 0.875rem;
 		font-weight: 600;
 		color: var(--text);
-		white-space: nowrap;
+		white-space: normal;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
