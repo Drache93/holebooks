@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "offset": 0,
   "schema": [
     {
@@ -11,6 +11,21 @@
       "versionField": null,
       "indexes": [],
       "schema": "@holebooks/book",
+      "derived": false,
+      "key": [
+        "id"
+      ],
+      "trigger": null
+    },
+    {
+      "name": "covers",
+      "namespace": "holebooks",
+      "id": 1,
+      "type": 1,
+      "version": 2,
+      "versionField": null,
+      "indexes": [],
+      "schema": "@holebooks/cover",
       "derived": false,
       "key": [
         "id"

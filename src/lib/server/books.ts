@@ -1,6 +1,39 @@
 import type { Book, BookStatus, YearStats } from '$lib/types'
 import type { DB } from '$lib/server/app'
 
+let _fetchImpl: typeof fetch | null = null
+
+async function outboundFetch(url: string, init?: RequestInit): Promise<Response> {
+	if (!_fetchImpl) {
+		if (typeof globalThis.fetch === 'function') {
+			_fetchImpl = globalThis.fetch
+		} else {
+			const m = await import('bare-fetch' as string) as { default: typeof fetch }
+			_fetchImpl = m.default
+		}
+	}
+	return _fetchImpl(url, init as Parameters<typeof fetch>[1]) as Promise<Response>
+}
+
+export async function cacheCoverImage(db: DB, bookId: string, coverUrl: string): Promise<void> {
+	try {
+		const res = await outboundFetch(coverUrl, { headers: { 'User-Agent': 'Holebooks/1.0' } })
+		if (!res.ok) return
+		const contentType = res.headers.get('content-type') ?? 'image/jpeg'
+		const data = Buffer.from(await res.arrayBuffer())
+		await db.insert('@holebooks/covers', { id: bookId, data, contentType })
+		await db.flush()
+	} catch {
+		// best-effort
+	}
+}
+
+export async function getCoverImage(db: DB, bookId: string): Promise<{ data: Buffer; contentType: string } | null> {
+	const raw = await db.get('@holebooks/covers', { id: bookId })
+	if (!raw) return null
+	return { data: Buffer.from(raw.data as Uint8Array), contentType: raw.contentType as string }
+}
+
 const SEED_BOOKS: Book[] = [
 	{
 		id: '1',
@@ -127,6 +160,16 @@ function toBook(raw: Record<string, unknown>): Book {
 	}
 }
 
+export async function migrateCoverImages(db: DB): Promise<void> {
+	const raws = await db.find('@holebooks/books', { gte: {}, lte: {} }).toArray()
+	for (const raw of raws) {
+		if (!raw.coverUrl) continue
+		const existing = await db.get('@holebooks/covers', { id: raw.id })
+		if (existing) continue
+		await cacheCoverImage(db, raw.id as string, raw.coverUrl as string)
+	}
+}
+
 export async function seedIfEmpty(db: DB): Promise<void> {
 	const existing = await db.find('@holebooks/books', { gte: {}, lte: {} }).toArray()
 	if (existing.length > 0) return
@@ -151,6 +194,7 @@ export async function createBook(db: DB, data: Omit<Book, 'id' | 'dateAdded'>): 
 	const book: Book = { ...data, id, dateAdded: new Date().toISOString().slice(0, 10) }
 	await db.insert('@holebooks/books', book)
 	await db.flush()
+	if (book.coverUrl) await cacheCoverImage(db, id, book.coverUrl)
 	return book
 }
 

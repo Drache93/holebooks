@@ -33,6 +33,15 @@ ns.register({
   ]
 })
 
+ns.register({
+  name: 'cover',
+  fields: [
+    { name: 'id',          type: 'string', required: true }, // book ID
+    { name: 'data',        type: 'buffer', required: true }, // raw image bytes
+    { name: 'contentType', type: 'string', required: true }  // e.g. image/jpeg
+  ]
+})
+
 Hyperschema.toDisk(schema, { esm: true })
 
 // 2. Collection definitions
@@ -42,6 +51,12 @@ const dbns = db.namespace('holebooks')
 dbns.collections.register({
   name: 'books',
   schema: '@holebooks/book',
+  key: ['id']
+})
+
+dbns.collections.register({
+  name: 'covers',
+  schema: '@holebooks/cover',
   key: ['id']
 })
 

@@ -5,7 +5,7 @@
 import { IndexEncoder, c, b4a } from 'hyperdb/runtime'
 import { version, getEncoding, setVersion } from './messages.js'
 
-const versions = { schema: version, db: 1 }
+const versions = { schema: version, db: 2 }
 
 // '@holebooks/books' collection key
 const collection0_key = new IndexEncoder([
@@ -74,8 +74,76 @@ const collection0 = {
   decodedVersion: 0
 }
 
+// '@holebooks/covers' collection key
+const collection1_key = new IndexEncoder([
+  IndexEncoder.STRING
+], { prefix: 1 })
+
+function collection1_indexify (record) {
+  const a = record.id
+  return a === undefined ? [] : [a]
+}
+
+// '@holebooks/covers' value encoding
+const collection1_enc = getEncoding('@holebooks/cover/hyperdb#1')
+
+// '@holebooks/covers' reconstruction function
+function collection1_reconstruct (schemaVersion, keyBuf, valueBuf) {
+  const key = collection1_key.decode(keyBuf)
+  setVersion(schemaVersion)
+  const state = { start: 0, end: valueBuf.byteLength, buffer: valueBuf }
+  const type = c.uint.decode(state)
+  if (type !== 0) throw new Error('Unknown collection type: ' + type)
+  collection1.decodedVersion = c.uint.decode(state)
+  const record = collection1_enc.decode(state)
+  record.id = key[0]
+  return record
+}
+// '@holebooks/covers' key reconstruction function
+function collection1_reconstruct_key (keyBuf) {
+  const key = collection1_key.decode(keyBuf)
+  return {
+    id: key[0]
+  }
+}
+
+// '@holebooks/covers'
+const collection1 = {
+  name: '@holebooks/covers',
+  id: 1,
+  version: 2,
+  encodeKey (record) {
+    const key = [record.id]
+    return collection1_key.encode(key)
+  },
+  encodeKeyRange ({ gt, lt, gte, lte } = {}) {
+    return collection1_key.encodeRange({
+      gt: gt ? collection1_indexify(gt) : null,
+      lt: lt ? collection1_indexify(lt) : null,
+      gte: gte ? collection1_indexify(gte) : null,
+      lte: lte ? collection1_indexify(lte) : null
+    })
+  },
+  encodeValue (schemaVersion, collectionVersion, record) {
+    setVersion(schemaVersion)
+    const state = { start: 0, end: 2, buffer: null }
+    collection1_enc.preencode(state, record)
+    state.buffer = b4a.allocUnsafe(state.end)
+    state.buffer[state.start++] = 0
+    state.buffer[state.start++] = collectionVersion
+    collection1_enc.encode(state, record)
+    return state.buffer
+  },
+  trigger: null,
+  reconstruct: collection1_reconstruct,
+  reconstructKey: collection1_reconstruct_key,
+  indexes: [],
+  decodedVersion: 0
+}
+
 const collections = [
-  collection0
+  collection0,
+  collection1
 ]
 
 const indexes = [
@@ -86,6 +154,7 @@ export default { versions, collections, indexes, resolveCollection, resolveIndex
 function resolveCollection (name) {
   switch (name) {
     case '@holebooks/books': return collection0
+    case '@holebooks/covers': return collection1
     default: return null
   }
 }

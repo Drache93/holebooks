@@ -5,7 +5,7 @@ import Hyperbee from 'hyperbee2'
 import def from '../../../spec/hyperdb/index.js'
 import storage from 'bare-storage'
 import path from 'path'
-import { seedIfEmpty } from '$lib/server/books'
+import { seedIfEmpty, migrateCoverImages } from '$lib/server/books'
 
 export type DB = ReturnType<typeof HyperDB.bee2>
 
@@ -25,6 +25,7 @@ export default class HolebooksApp extends ReadyResource {
 		this.db = HyperDB.bee2(this.bee, def)
 		await this.db.ready()
 		await seedIfEmpty(this.db)
+		migrateCoverImages(this.db).catch(console.error)
 	}
 
 	protected async _close(): Promise<void> {

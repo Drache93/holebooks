@@ -185,6 +185,7 @@
                     title={book.title}
                     {color}
                     coverUrl={book.coverUrl}
+                    bookId={book.id}
                 />
                 {#if book.status === "read"}
                     <span class="cover-check">✓</span>
@@ -351,18 +352,6 @@
                     </form>
                 </div>
 
-                <!-- Pause reading -->
-                <div class="card card-flat anim">
-                    <p class="card-label">Pause reading</p>
-                    <p class="card-hint">Move back to your Want to Read list</p>
-                    <form
-                        method="POST"
-                        action="?/stopReading"
-                        use:enhance={mkEnhance()}
-                    >
-                        <button class="btn-ghost">Stop reading</button>
-                    </form>
-                </div>
             {/if}
 
             <!-- Start reading -->
@@ -469,6 +458,21 @@
 
         <!-- ── Side column ── -->
         <div class="cards-col side-col">
+            <!-- Pause reading -->
+            {#if book.status === "reading"}
+                <div class="card card-flat anim">
+                    <p class="card-label">Pause reading</p>
+                    <p class="card-hint">Move back to your Want to Read list</p>
+                    <form
+                        method="POST"
+                        action="?/stopReading"
+                        use:enhance={mkEnhance()}
+                    >
+                        <button class="btn-ghost">Stop reading</button>
+                    </form>
+                </div>
+            {/if}
+
             <!-- Edit details -->
             <div class="card anim">
                 <button
@@ -803,6 +807,16 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+    }
+
+    .side-col {
+        margin-top: 12px;
+    }
+
+    @media (min-width: 700px) {
+        .side-col {
+            margin-top: 0;
+        }
     }
 
     /* ── Card ── */

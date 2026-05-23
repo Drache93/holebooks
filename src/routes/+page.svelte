@@ -164,6 +164,7 @@
                                     title={book.title}
                                     color={c}
                                     coverUrl={book.coverUrl}
+                                    bookId={book.id}
                                 />
                             </div>
                             <div class="rc-info">
@@ -229,6 +230,7 @@
                                             title={book.title}
                                             color={c}
                                             coverUrl={book.coverUrl}
+                                            bookId={book.id}
                                             small
                                         />
                                         <span class="tile-check">✓</span>
@@ -281,6 +283,7 @@
                                     title={book.title}
                                     color={c}
                                     coverUrl={book.coverUrl}
+                                    bookId={book.id}
                                     small
                                 />
                             </div>

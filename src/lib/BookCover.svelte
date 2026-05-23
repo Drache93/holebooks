@@ -4,11 +4,13 @@
 		color: { bg: string; accent: string; text: string }
 		small?: boolean
 		coverUrl?: string
+		bookId?: string
 	}
 
-	let { title, color, small = false, coverUrl }: Props = $props()
+	let { title, color, small = false, coverUrl, bookId }: Props = $props()
 
 	let failed = $state(false)
+	let apiMissed = $state(false)
 
 	function initials(t: string) {
 		return t
@@ -19,9 +21,23 @@
 			.join('')
 	}
 
-	const src = $derived(
+	const fallbackSrc = $derived(
 		coverUrl ?? `https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-M.jpg`
 	)
+
+	const src = $derived(
+		bookId && !apiMissed
+			? `/api/books/${bookId}/cover`
+			: fallbackSrc
+	)
+
+	function handleError() {
+		if (bookId && !apiMissed) {
+			apiMissed = true  // first failure: API not cached yet, try direct URL
+		} else {
+			failed = true     // second failure: nothing works, show initials
+		}
+	}
 </script>
 
 {#if !failed}
@@ -29,7 +45,7 @@
 		{src}
 		alt="{title} cover"
 		class="cover-photo"
-		onerror={() => (failed = true)}
+		onerror={handleError}
 	/>
 {/if}
 {#if failed}
