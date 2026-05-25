@@ -1,42 +1,53 @@
-# sv
+# Holebooks
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A personal reading tracker. Track what you're reading, what you've read, and what you want to read next — with book cover art, progress tracking, and star ratings.
 
-## Creating a project
+![Holebooks running on macOS and Android](demo.png)
 
-If you're seeing this, you've probably already done this step. Congrats!
+Built with [SvelteKit](https://svelte.dev/docs/kit) on the [Bare](https://github.com/holepunchto/bare) runtime, packaged as a native desktop and Android app via [`sveltekit-adapter-bare`](https://github.com/holepunchto/sveltekit-adapter-bare).
+
+## Features
+
+- Search and add books via Open Library
+- Track reading status: Want to Read, Reading, Read
+- Progress tracking with page counts
+- Star ratings and read dates
+- Book cover art cached locally with HyperDB
+- Works on macOS and Android
+
+## Stack
+
+- **SvelteKit** — UI and routing
+- **sveltekit-adapter-bare** — packages the app for the Bare runtime
+- **HyperDB** — local persistent storage (hyperbee2 backend)
+- **bare-native** — native window and WebView
+- **bare-http1** — local HTTP server
+
+## Development
 
 ```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.15.3 create --template minimal --types ts --install npm .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
+npm install
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+Opens a browser dev server at `http://localhost:5173`.
 
-To create a production version of your app:
+## Build
 
 ```sh
+# 1. SvelteKit build — emits ./build
 npm run build
+
+# 2. Package for the target platform
+npx bare-build \
+  --out build/darwin-arm64 \
+  --host darwin-arm64 \
+  --runtime bare-native/runtime \
+  build/index.js
 ```
 
-You can preview the production build with `npm run preview`.
+Swap `--host` / `--out` for other targets (`linux-x64`, `android-arm64`, etc.).
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## License
+
+Apache-2.0
